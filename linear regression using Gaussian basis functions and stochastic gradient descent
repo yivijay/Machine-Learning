@@ -1,0 +1,311 @@
+%% A matlab file that takes as input a data set and 
+%  1. divides it into training, testing and validation set.
+%  2. Clusters the data using k-means
+%  3. Finds the variance of each cluster
+%  4. User need to specify hyper-parameters M and Lambda.
+%  5. First uses batch method and Finds M basis functions, creates design matrix to learn weights and calculates RMS error over training and validation data
+%  6. Next achieves the same thing using stochastic grdient descent method
+%%
+
+function proj2temp ()
+%% Initialize variables.
+ 
+load('C:\synthetic.mat');
+filename = 'C:\Querylevelnorm.txt';
+delimiter = {' ',':'};
+formatSpec = '%f%*s%*s%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%f%*s%*s%*s%*s%*s%*s%*s%*s%*s%[^\n\r]';
+
+%% Open the text file.
+fileID = fopen(filename,'r');
+dataArray = textscan(fileID, formatSpec, 'Delimiter', delimiter, 'MultipleDelimsAsOne', true, 'EmptyValue' ,NaN, 'ReturnOnError', false);
+%% Close the text file.
+fclose(fileID);
+RealWorldDataInitial = [dataArray{1:end-1}];
+RealWorldForStoc = [dataArray{1:end-1}];
+TargetforStoc = RealWorldForStoc(:,1);
+RealWorldForStoc(:,1) = [];
+%% Clear temporary variables
+clearvars filename delimiter formatSpec fileID dataArray ans;
+[m,n] = size(RealWorldDataInitial);
+%Real World Training Data
+training1 = round((80/100)*size(RealWorldDataInitial));
+TrainingRealWorld = RealWorldDataInitial(1:training1(1),:);
+RealWorldDataInitial(1:training1(1),:) = [];
+ttraining = TrainingRealWorld(:,1);
+TrainingRealWorld(:,1) = [];
+
+%%Real World Validaion Data
+valid1 = round((10/100) * m);
+ValidationRealWorld = RealWorldDataInitial(1:valid1(1),:);
+RealWorldDataInitial(1:valid1(1),:) = [];
+tvalidation = ValidationRealWorld(:,1);
+ValidationRealWorld(:,1) = [];
+ValidationRealWorldSize = size(ValidationRealWorld);
+
+%Real World Testing Data
+TestingRealWorld = RealWorldDataInitial;
+trainInd1 = 1:training1(1);
+trainInd1 = trainInd1';
+validInd1 = training1(1)+1:training1(1)+valid1;
+validInd1 = validInd1';
+tTesting = TestingRealWorld(:,1);
+TestingRealWorld(:,1) = [];
+clear('RealWorldDataInitial');
+
+%Synthetic Data
+SyntheticWorldInitial = x';
+clear('x');
+[m,n] = size(SyntheticWorldInitial);
+training2 = round((70/100)*size(SyntheticWorldInitial));
+SyntheticWorldTraining = SyntheticWorldInitial(1:training2(1),:);
+SyntheticWorldInitial(1:training2,:) = [];
+valid2 = m - training2(1) ;
+SyntheticWorldValidation = SyntheticWorldInitial;
+trainInd2 = 1:training2(1);
+trainInd2 = trainInd2';
+validInd2 = training2(1)+1:training2(1)+valid2;
+validInd2 = validInd2';
+synTrain = t(1:training2(1));
+synValid = t(training2(1)+1:training2(1)+valid2);
+
+M1 = 6;
+
+%%
+%Create Clusters
+[Idx,C] = kmeans(TrainingRealWorld, M1 );
+mu1 = C';
+clsrow(1:M1) = 1;
+for i=1:size(Idx)    
+    for l = 1:M1
+        if Idx(i) == l
+            Cluster(clsrow(l),:,l) = TrainingRealWorld(i,:);
+            clsrow(l) = clsrow(l) +1 ;
+        end
+    end
+end 
+
+%%
+%Find Sigma of each cluster
+for i = 1:M1
+    Sigma1(:,:,i) = diag(var(Cluster(:,:,i)));
+    Sigma1(:,:,i) = Sigma1(:,:,i) + (1.2 * eye(46));
+end
+Sigma1(:,:,2) = Sigma1(:,:,1);
+Sigma1(:,:,3) = Sigma1(:,:,1);
+Sigma1(:,:,4) = Sigma1(:,:,1);
+Sigma1(:,:,5) = Sigma1(:,:,1);
+Sigma1(:,:,6) = Sigma1(:,:,1);
+
+%%Calculate Inverses of sigma
+
+for i= 1:M1
+    sigmainv(:,:,i) = inv(Sigma1(:,:,i));
+end
+
+%%Design Matrix
+for x = 1:training1(1)  
+    for i =1:M1
+       design(x,i) = phifunct(TrainingRealWorld(x,:),C(i,:),sigmainv(:,:,i));
+    end
+end
+    
+    design (:,1) = 1 ;
+%%
+% Find W1 batch method
+designtrans = design';
+lambda1 = 0.1;
+lambda = lambda1 * eye(M1);
+temp = (lambda + (designtrans * design));
+Wml = (temp \ design');
+w1 = Wml * ttraining;
+clear('Wml');
+clear ('designtrans');
+clear('lambda');
+
+
+%%
+%delta w using gradient descent
+w01 = [7,6,5,4,3,2];
+w01 = w01';
+
+Wstart=w01;
+[m,n] = size(TrainingRealWorld);
+for i=1:m  
+    eta=0.3;
+    Ew=lambda1*Wstart;
+    Ed=(ttraining(i)-(Wstart'*(design(i,:)')))*(design(i,:)');
+    E=Ed-Ew;
+    dwtemp1=eta*E; 
+    dw1(:,i)=dwtemp1;
+%     eta1(1:i)=j;
+    Wstart=Wstart+dw1(:,i);
+end
+eta1(1,1:i) = 0.3;
+
+%%
+%Find Erms for training Data
+Y = design * w1;
+[m,n] = size(ttraining);
+error = ttraining - Y;
+error = power(error,2);
+error = sum(error);
+error = 0.5 * error;
+Erms = 2 * error;
+Erms = Erms/m;
+trainPer1 = sqrt(Erms);
+
+clear('error');
+clear('Erms');
+%clear('design');
+% clear('sigmainv');
+clear('Cluster');
+clear('clsrow');
+clear('Idx');
+% clear('C');
+
+%%
+% Validation design matrix
+for x=1:ValidationRealWorldSize(1)
+   for i =1:M1
+        designValidation(x,i) = phifunct(ValidationRealWorld(x,:),C(i,:),sigmainv(:,:,i));
+   end
+end
+
+designValidation (:,1) = 1;
+
+clear('x');
+clear('i');
+
+%%
+%Find Erms for Validation Data
+YValidation = designValidation * w1;
+errorValidation = tvalidation - YValidation;
+[m,n] = size(tvalidation);
+errorValidation = power(errorValidation,2);
+errorValidation = sum(errorValidation);
+errorValidation = 0.5 * errorValidation;
+ErmsValidation = 2 * errorValidation;
+ErmsValidation = ErmsValidation/m;
+validPer1 = sqrt(ErmsValidation);
+
+% clear('designValidation');
+% clear('errorValidation');
+% clear('ErmsValidation');
+
+%%
+
+
+M2 =6;
+lambda2 = 0.9;
+%%
+%Create Cluster
+[Idx2,C2] = kmeans(SyntheticWorldTraining, M2 );
+mu2 = C2';
+clsrow2(1:M2) = 1;
+for i=1:size(Idx2)    
+    for l = 1:M2
+        if Idx2(i) == l
+            Cluster2(clsrow2(l),:,l) = SyntheticWorldTraining(i,:);
+            clsrow2(l) = clsrow2(l) +1 ;
+        end
+    end
+end 
+
+
+%%
+%Find Sigma of each cluster
+for i = 1:M2
+    Sigma2(:,:,i) = diag(var(Cluster2(:,:,i)));
+    Sigma2(:,:,i) = Sigma2(:,:,i) + (0.1 * eye(10));
+end
+
+%Calculate Inverses of sigma
+
+for i= 1:M2
+    sigmainv2(:,:,i) = inv(Sigma2(:,:,i));
+end
+
+%%
+%%Design Matrix
+[m,n] = size(SyntheticWorldTraining);
+for x = 1:m
+    for i =1:M2
+       design2(x,i) = phifunct(SyntheticWorldTraining(x,:),C2(i,:),sigmainv2(:,:,i));
+    end
+end
+clear ('x');
+clear('l');
+design2(:,1) = 1 ;
+
+%%
+% Find W2
+designtrans2 = design2';
+lambda = lambda2 * eye(M2);
+temp2 = (lambda + (designtrans2 * design2));
+Wml2 = (temp2 \ design2');
+w2 = Wml2 * synTrain;
+clear('Wml2');
+clear ('designtrans2');
+
+%%
+% W2 using gradient descent
+%delta w using gradient descent
+w02 = [7,6,5,4,3,2];
+w02 = w02';
+
+Wstart2=w02;
+[m,n] = size(SyntheticWorldTraining);
+for i=1:m  
+    eta=0.3;
+    Ew2=lambda2*Wstart2;
+    Ed2=(synTrain(i)-(Wstart2'*(design2(i,:)')))*(design2(i,:)');
+    E2=Ed2-Ew2;
+    dwtemp2=eta*E2; 
+    dw2(:,i)=dwtemp2;
+%     eta1(1:i)=j;
+    Wstart2=Wstart2+dw2(:,i);
+end
+eta2(1,1:i) = 0.3;
+
+%%
+%Find Erms for training Data
+Y2 = design2 * w2;
+error = synTrain - Y2;
+error = power(error,2);
+error = sum(error);
+error = 0.5 * error;
+Erms = 2 * error;
+Erms = Erms/m;
+trainPer2 = sqrt(Erms);
+
+%%
+% Validation design matrix
+for x=1:size(synValid);
+   for i =1:M2
+        designValidation2(x,i) = phifunct(SyntheticWorldValidation(x,:),C2(i,:),sigmainv2(:,:,i));
+   end
+end
+clear('x');
+clear('i');
+
+designValidation2(:,1) = 1;
+%%
+%Find Erms for Validation Data
+[m,n] = size(synValid);
+YValidation2 = designValidation2 * w2;
+errorValidation2 = synValid - YValidation2;
+errorValidation2 = power(errorValidation2,2);
+errorValidation2 = sum(errorValidation2);
+errorValidation2 = 0.5 * errorValidation2;
+ErmsValidation2 = 2 * errorValidation2;
+ErmsValidation2 = ErmsValidation2/m;
+validPer2 = sqrt(ErmsValidation2);
+save proj2.mat;
+load proj2.mat;
+end
+
+function [ value ] = phifunct( x,mu,sigmainv )
+temp = x-mu;
+value = exp((-0.5)*((temp*sigmainv)*temp'));
+end
+
