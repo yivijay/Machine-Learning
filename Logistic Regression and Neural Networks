@@ -1,0 +1,190 @@
+imagesTesting = loadMNISTImages('C:\Users\vijay\OneDrive\UB Lectures\ML\Project\Project 3\t10k-images.idx3-ubyte');
+labelsTesting = loadMNISTLabels('C:\Users\vijay\OneDrive\UB Lectures\ML\Project\Project 3\t10k-labels.idx1-ubyte');
+imagesTraining = loadMNISTImages('C:\Users\vijay\OneDrive\UB Lectures\ML\Project\Project 3\train-images.idx3-ubyte');
+labelsTraining = loadMNISTLabels('C:\Users\vijay\OneDrive\UB Lectures\ML\Project\Project 3\train-labels.idx1-ubyte');
+
+K = unique(labelsTesting);
+K =size(K,1); % no. of classes
+Wlr = randn(size(imagesTraining,1),K) * 0.1;
+blr = randn(1,K) * 0.1;
+weight = [Wlr;blr];
+eta = 0.01;
+
+%% 
+%convert testing Labels to 1 of K coding scheme
+testinglabels = zeros(size(labelsTesting,1),K);
+for i=1:size(labelsTesting,1)
+    k = labelsTesting(i) + 1;
+    testinglabels(i,k) = 1;
+end
+
+% Convert Training Labels to 1 of K coding scheme
+traininglabels = zeros(size(labelsTraining,1),K);
+for i=1:size(labelsTraining,1)
+    k = labelsTraining(i) + 1;
+    traininglabels(i,k) = 1;
+end
+
+%Convert Training Images to incorporate bias
+biasimagesTraining  = [imagesTraining;ones(1,size(imagesTraining,2))];
+
+%Convert Testing Images to incorporate bias
+biasimagesTesting  = [imagesTesting;ones(1,size(imagesTesting,2))];
+%%
+% Using Stochiastic Gradient to calculate w
+yk = zeros(size(biasimagesTraining,2),K);
+newyk = zeros(size(biasimagesTraining,2),K);
+for i=1:size(biasimagesTraining,2)
+    ak = weight' * biasimagesTraining(:,i);
+    large = max(ak);
+    pn = exp(ak/large);
+    yk(i,:) = pn/sum(pn);
+%     yk(i,:) = softmax((Wlr' * imagesTraining(:,i)) + blr');
+    [large,pos] = max(yk(i,:));
+    newyk(i,pos) = 1;
+    dw = biasimagesTraining(:,i) * (newyk(i,:) - traininglabels(i,:)) ;
+    weight = weight - (eta * dw);
+end
+
+%%
+%Testing Data
+yt = zeros(size(biasimagesTesting,2),K);
+for i=1:size(biasimagesTesting,2)
+    at = weight' * biasimagesTesting(:,i);
+    large = max(at);
+    pn = exp(at/large);
+    yt(i,:) = pn/sum(pn);
+%     yt(i,:) = softmax((Wlr' * imagesTesting(:,i)) + blr');
+end
+cnt = 0;
+yfinal = zeros(size(biasimagesTesting,2),K);
+
+%%
+%Check Success
+for i=1:size(imagesTesting,2)
+    [num,pos] = max(yt(i,:));
+    yfinal(i,pos) = 1;
+    if yfinal(i,:) == testinglabels(i,:)
+        cnt = cnt + 1;
+    end
+end
+accuracy = (cnt/size(testinglabels,1)) * 100;
+fprintf('accuracy: %f \n' , accuracy);
+
+Wlr = weight(1:(size(weight,1)-1),:);
+blr = weight(785,:);
+%%
+% Clear variables
+clear('testinglabels','traininglabels');
+clear('ak','yk','at','yt');
+clear('yfinal');
+clear('dw');
+clear('num');
+clear('pos');
+clear('large');
+clear('i');
+clear('pn');
+clear('newyk');
+clear('k');
+clear('eta','wight');
+clear('K','accuracy');
+clear('cnt');
+%%
+%Neural Network
+trainSize = size(imagesTraining);  
+testSize = size(imagesTesting);
+ h = 'sigmoid';
+  
+ N = trainSize(2); % no of datapoints
+ hidden = 300;  % no of hidden units
+ input = trainSize(1);  
+ output = 10;  % no of output units
+ 
+ max_passes = 10;  
+%  beta = 0.01; % Scaling factor in sigmoid function  
+ eta2 = 0.01; % Learning rate  
+ 
+ %% Initialize the weights from Uniform(0, 1)  
+%  Wnn1 = rand(TOTAL_IN + 1, TOTAL_HU); % Weight for layer-1, including bias unit  
+%  Wnn2 = rand(TOTAL_HU + 1, TOTAL_OUT); % Weight for layer-2. including bias unit  
+ Wnn1 = rand(input, hidden) * 0.1; % Weight for layer-1, including bias unit  
+ Wnn2 = rand(hidden, output) * 0.1; % Weight for layer-2. including bias unit  
+
+ bnn1 = randn(1,hidden) * 0.1;
+ bnn2 = randn(1,output) * 0.1;
+  
+%%
+ x1 = zeros(input, 1);  
+ z = zeros(hidden, 1);  
+ z = zeros(hidden, 1);  
+ yk = zeros(output, 1);  
+ e1 = zeros(input, 1);  
+ delj = zeros(hidden, 1);  
+ delk = zeros(output, 1);  
+ dw1 = zeros(input, hidden);  
+ dw2 = zeros(hidden, output);  
+
+ A = eye(output);  
+ success = zeros(max_passes, 1);  
+ %% Training  
+ for t = 1:max_passes  
+   fprintf('Iteration %d\n', t);   
+   for p = 1:N  
+     if (mod(p, 1000) == 0)  
+       fprintf('\t%d\n', p);  
+     end  
+     % Propogate forward 
+    x1 = imagesTraining(:, p);  
+    z = logsig((Wnn1' * x1)+bnn1');
+    yk =logsig((Wnn2' * z) + bnn2');
+     
+     % Propogate backward   
+    delk = yk - A(:, labelsTraining(p) + 1); 
+    delj = Wnn2 * ((z * delk')' * (1 - z));  
+    delj = delj(1:hidden);  
+    e1 = Wnn1 * delj;  
+    % Update weight  
+    Wnn2 = Wnn2 - eta2 * z * delk';  
+    Wnn1 = Wnn1 - eta2 * x1 * delj';  
+   end  
+   %% Check training error  
+   success(t) = 0;  
+   for i = 1:N  
+     x1 = imagesTraining(:, i);
+     z = logsig((Wnn1' * x1)+bnn1'); 
+     yk =logsig((Wnn2' * z) + bnn2');
+    [dummy, m] = max(yk);  
+     if (m == labelsTraining(i) + 1)  
+       success(t) = success(t) + 1;  
+     end  
+   end  
+ end  
+ 
+ %%
+ %Testing Data
+ testSuccess = 0;  
+ for i = 1:testSize(2)  
+    x1 = imagesTesting(:, i);
+    z = logsig((Wnn1' * x1)+bnn1');
+    yk =logsig((Wnn2' * z) + bnn2');
+    [dummy, m] = max(yk);  
+    if (m == labelsTesting(i) + 1)  
+      testSuccess = testSuccess + 1;  
+    end  
+ end  
+ 
+ %%
+%  %Clear Variables
+ clear('A');
+ clear('dw1');
+ clear('dw2');
+ clear('m');
+ clear('dummy');
+ clear('i');
+ clear('N');
+ clear('trainSize');
+ clear('testSize');
+ clear('max_passes');
+ clear('p');
+ clear('t');
+ clear('success','input','output');
